@@ -112,7 +112,6 @@ def do_populate():
 
     ####################################################
 
-    train_data_sample_keys = []
     print(f'register train data (from server) on datamanager {org_1} (will take datamanager creator as worker)')
     data_samples_path = ['./fixtures/chunantes/datasamples/train/0024306',
                          './fixtures/chunantes/datasamples/train/0024307']
@@ -141,9 +140,19 @@ def do_populate():
     }
     data_manager_org0_key = get_or_create(data, org_0, 'data_manager')
 
+    print(f'create second datamanager, test data and objective on {org_0}')
+    data = {
+        'name': 'New Simplified ISIC 2018',
+        'data_opener': os.path.join(dir_path, './fixtures/owkin/datamanagers/datamanager1/opener.py'),
+        'type': 'Images',
+        'description': os.path.join(dir_path, './fixtures/owkin/datamanagers/datamanager1/description.md'),
+        'permissions': 'all'
+    }
+    data_manager1_org0_key = get_or_create(data, org_0, 'data_manager')
+
     ####################################################
 
-    print('register test data')
+    print(f'register test data (from server) on datamanager {org_0} (will take datamanager creator as worker)')
     data = {
         'paths': [
             os.path.join(dir_path, './fixtures/owkin/datasamples/test/0024900.zip'),
@@ -156,7 +165,7 @@ def do_populate():
 
     ####################################################
 
-    print('register test data 2')
+    print(f'register test data (from server) on datamanager {org_0} (will take datamanager creator as worker)')
     data = {
         'paths': [
             os.path.join(dir_path, './fixtures/owkin/datasamples/test/0024902.zip'),
@@ -169,7 +178,7 @@ def do_populate():
 
     ####################################################
 
-    print('register test data 3')
+    print(f'register test data (from server) on datamanager {org_0} (will take datamanager creator as worker)')
     data = {
         'paths': [
             os.path.join(dir_path, './fixtures/owkin/datasamples/test/0024904.zip'),
