@@ -86,12 +86,16 @@ def find_primary_key_error(validation_error, key_name='pkhash'):
 
 def validate_pk(pk):
     if len(pk) != 64:
-        raise Exception(f'Wrong pk {pk}')
+        raise ViewException(f'Wrong pk {pk}')
 
     try:
         int(pk, 16)  # test if pk is correct (hexadecimal)
     except ValueError:
-        raise Exception(f'Wrong pk {pk}')
+        raise ViewException(f'Wrong pk {pk}')
+
+
+class ViewException(Exception):
+    pass
 
 
 class LedgerException(Exception):

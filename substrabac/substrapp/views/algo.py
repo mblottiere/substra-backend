@@ -2,7 +2,7 @@ import tempfile
 import logging
 
 from django.http import Http404
-from rest_framework import status, mixins
+from rest_framework import status, mixins, serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -14,7 +14,7 @@ from substrapp.utils import get_hash, is_archive
 from substrapp.ledger_utils import query_ledger, get_object_from_ledger, LedgerError, LedgerTimeout, LedgerConflict
 from substrapp.views.utils import (ManageFileMixin, find_primary_key_error,
                                    validate_pk, get_success_create_code, LedgerException, ValidationException,
-                                   get_remote_asset)
+                                   get_remote_asset, ViewException)
 from substrapp.views.filters_utils import filter_list
 
 
@@ -71,7 +71,7 @@ class AlgoViewSet(mixins.CreateModelMixin,
     def _create(self, request, file):
 
         if not is_archive(file):
-            raise Exception('Archive must be zip or tar.*')
+            raise ViewException('Archive must be zip or tar.*')
 
         pkhash = get_hash(file)
         serializer = self.get_serializer(data={
@@ -82,7 +82,7 @@ class AlgoViewSet(mixins.CreateModelMixin,
 
         try:
             serializer.is_valid(raise_exception=True)
-        except Exception as e:
+        except serializers.ValidationError as e:
             st = status.HTTP_400_BAD_REQUEST
             if find_primary_key_error(e):
                 st = status.HTTP_409_CONFLICT
@@ -100,7 +100,7 @@ class AlgoViewSet(mixins.CreateModelMixin,
             return Response({'message': e.data, 'pkhash': e.pkhash}, status=e.st)
         except LedgerException as e:
             return Response({'message': e.data}, status=e.st)
-        except Exception as e:
+        except ViewException as e:
             return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             headers = self.get_success_headers(data)
@@ -152,7 +152,7 @@ class AlgoViewSet(mixins.CreateModelMixin,
             data = self._retrieve(pk)
         except LedgerError as e:
             return Response({'message': str(e.msg)}, status=e.status)
-        except Exception as e:
+        except ViewException as e:
             return Response({'message': str(e)}, status.HTTP_400_BAD_REQUEST)
         else:
             return Response(data, status=status.HTTP_200_OK)
@@ -176,7 +176,7 @@ class AlgoViewSet(mixins.CreateModelMixin,
                     query_params=query_params)
             except LedgerError as e:
                 return Response({'message': str(e.msg)}, status=e.status)
-            except Exception as e:
+            except ViewException as e:
                 logging.exception(e)
                 return Response(
                     {'message': f'Malformed search filters {query_params}'},

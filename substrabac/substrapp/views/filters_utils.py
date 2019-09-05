@@ -1,6 +1,7 @@
 from urllib.parse import unquote
 
 from substrapp.ledger_utils import query_ledger
+from substrapp.views.utils import ViewException
 
 
 FILTER_QUERIES = {
@@ -32,6 +33,8 @@ def get_filters(query_params):
 
         for subfilter in subfilters:
             el = subfilter.split(':')
+            if len(el) < 3:
+                raise ViewException(f'unsuported filter format: {el}')
             # get parent
             parent = el[0]
             subparent = el[1]
@@ -68,7 +71,7 @@ def filter_list(object_type, data, query_params):
         for filter_key, subfilters in user_filter.items():
 
             if filter_key not in AUTHORIZED_FILTERS[object_type]:
-                raise Exception(f'Not authorized filter key {filter_key} for asset {object_type}')
+                raise ViewException(f'Not authorized filter key {filter_key} for asset {object_type}')
 
             # Will be appended in object_list after been filtered
             filtered_list = data
