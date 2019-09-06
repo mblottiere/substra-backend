@@ -3,7 +3,7 @@ import tempfile
 import logging
 from django.conf import settings
 from django.http import Http404
-from rest_framework import status, mixins
+from rest_framework import status, mixins, serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -19,7 +19,7 @@ from substrapp.utils import get_hash
 from substrapp.ledger_utils import query_ledger, get_object_from_ledger, LedgerError, LedgerTimeout, LedgerConflict
 from substrapp.views.utils import (ManageFileMixin, find_primary_key_error,
                                    validate_pk, get_success_create_code, ValidationException, LedgerException,
-                                   get_remote_asset)
+                                   get_remote_asset, ViewException)
 from substrapp.views.filters_utils import filter_list
 
 
@@ -42,7 +42,8 @@ class DataManagerViewSet(mixins.CreateModelMixin,
         try:
             node = ast.parse(file)
         except BaseException:
-            raise Exception('Opener must be a valid python file, please review your opener file and the documentation.')
+            raise ViewException('Opener must be a valid python file, \
+                please review your opener file and the documentation.')
 
         imported_module_names = [m.name for e in node.body if isinstance(e, ast.Import) for m in e.names]
         if 'substratools' not in imported_module_names:
@@ -103,7 +104,7 @@ class DataManagerViewSet(mixins.CreateModelMixin,
 
         try:
             serializer.is_valid(raise_exception=True)
-        except Exception as e:
+        except serializers.ValidationError as e:
             st = status.HTTP_400_BAD_REQUEST
             if find_primary_key_error(e):
                 st = status.HTTP_409_CONFLICT
@@ -133,7 +134,7 @@ class DataManagerViewSet(mixins.CreateModelMixin,
             return Response({'message': e.data, 'pkhash': e.pkhash}, status=e.st)
         except LedgerException as e:
             return Response({'message': e.data}, status=e.st)
-        except Exception as e:
+        except ViewException as e:
             return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             headers = self.get_success_headers(data)
@@ -200,7 +201,7 @@ class DataManagerViewSet(mixins.CreateModelMixin,
             data = self._retrieve(pk)
         except LedgerError as e:
             return Response({'message': str(e.msg)}, status=e.status)
-        except Exception as e:
+        except ViewException as e:
             return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response(data, status=status.HTTP_200_OK)
@@ -225,7 +226,7 @@ class DataManagerViewSet(mixins.CreateModelMixin,
                     query_params=query_params)
             except LedgerError as e:
                 return Response({'message': str(e.msg)}, status=e.status)
-            except Exception as e:
+            except ViewException as e:
                 logging.exception(e)
                 return Response(
                     {'message': f'Malformed search filters {query_params}'},
@@ -241,7 +242,7 @@ class DataManagerViewSet(mixins.CreateModelMixin,
 
         try:
             validate_pk(pk)
-        except Exception as e:
+        except ViewException as e:
             return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         objective_key = request.data.get('objective_key')
