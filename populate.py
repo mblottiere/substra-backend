@@ -198,19 +198,6 @@ def do_populate():
 
     ####################################################
 
-    print('register test data')
-    data = {
-        'paths': [
-            os.path.join(dir_path, './fixtures/owkin/datasamples/test/0024900'),
-            os.path.join(dir_path, './fixtures/owkin/datasamples/test/0024901')
-        ],
-        'data_manager_keys': [data_manager_org0_key],
-        'test_only': True,
-    }
-    test_data_sample_keys = get_or_create(data, org_0, 'data_samples')
-
-    ####################################################
-
     print('register test data 2')
     data = {
         'paths': [
@@ -250,7 +237,7 @@ def do_populate():
             'metrics_name': 'macro-average recall',
             'metrics': zip_path,
             'permissions': PUBLIC_PERMISSIONS,
-            'test_data_sample_keys': test_data_sample_keys,
+            # 'test_data_sample_keys': test_data_sample_keys,
             'test_data_manager_key': data_manager_org0_key
         }
 
@@ -355,6 +342,20 @@ def do_populate():
     client.set_profile(org_1)
     res = client.get_traintuple(traintuple_key)
     print(colored(json.dumps(res, indent=2), 'green'))
+
+    print('register test data')
+    data = {
+        'paths': [
+            os.path.join(dir_path, './fixtures/owkin/datasamples/test/0024900'),
+            os.path.join(dir_path, './fixtures/owkin/datasamples/test/0024901')
+        ],
+        'data_manager_keys': [data_manager_org1_key],
+        'test_only': True,
+    }
+
+    test_data_sample_keys = get_or_create(data, org_0, 'data_samples')
+
+    ####################################################
 
     # create testtuple
     print('create testtuple')
