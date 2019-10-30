@@ -5,6 +5,15 @@ import asyncio
 import glob
 import json
 import tempfile
+import hashlib
+
+import OpenSSL
+from Cryptodome.Util import asn1
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509 import NameOID
 
 from .org import ORG
 
@@ -15,6 +24,9 @@ from hfc.fabric.orderer import Orderer
 from hfc.util.keyvaluestore import FileKeyValueStore
 from hfc.fabric.block_decoder import decode_fabric_MSP_config, decode_fabric_peers_info, decode_fabric_endpoints
 
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
 
 LEDGER_CONFIG_FILE = os.environ.get('LEDGER_CONFIG_FILE', f'/substra/conf/{ORG}/substra-backend/conf.json')
 LEDGER = json.load(open(LEDGER_CONFIG_FILE, 'r'))
@@ -104,6 +116,95 @@ def get_hfc_client():
     update_client_with_discovery(client, results)
 
     return loop, client
+
+
+def get_creator(cert):
+
+    cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
+    pub = cert.get_pubkey()
+
+    creator = ''
+    # rsa case
+    if pub.type() == OpenSSL.crypto.TYPE_RSA:
+        pub_asn1 = OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_ASN1, pub)
+        pub_der = asn1.DerSequence()
+        pub_der.decode(pub_asn1)
+        modulus = pub_der[1]
+        creator = hashlib.sha256(modulus.to_bytes(256, byteorder='big')).hexdigest()
+    # ecdsa case
+    elif pub.type() == OpenSSL.crypto.TYPE_EC:
+        ecPublicNumbers = pub.to_cryptography_key().public_numbers()
+        x = ecPublicNumbers.x
+        y = ecPublicNumbers.y
+        point = bytes(f'{x}:{y}', 'utf-8')
+        creator = hashlib.sha256(point).hexdigest()
+
+    return creator
+
+
+def write_pkey_key(path):
+    # you can choose between rsa or ecdsa
+    # pkey = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+    pkey = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    data = pkey.private_bytes(encoding=serialization.Encoding.PEM,
+                              format=serialization.PrivateFormat.PKCS8,
+                              encryption_algorithm=serialization.NoEncryption())
+    with open(path, 'wb+') as f:
+        f.write(data)
+    return pkey
+
+
+# SECURITY WARNING: keep the private key used in production secret!
+# TODO will be override if docker is restarted, need to be passed as a volume
+PKEY_FILE = os.path.normpath(os.path.join(PROJECT_ROOT, 'PKEY'))
+
+# KEY CONFIGURATION
+# Try to load the PKEY from our PKEY_FILE. If that fails, then generate
+# a random PKEY and save it into our PKEY_FILE for future loading. If
+# everything fails, then just raise an exception.
+try:
+    pkey = open(PKEY_FILE, 'rb').read().strip()
+except IOError:
+    try:
+        pkey = write_pkey_key(PKEY_FILE)
+    except IOError:
+        raise Exception(f'Cannot open file `{PKEY_FILE}` for writing.')
+else:
+    pkey = serialization.load_pem_private_key(
+        pkey,
+        password=None,
+        backend=default_backend()
+    )
+
+# END KEY CONFIGURATION
+
+
+# TODO use dynamic data, and remove default
+def get_csr(pkey,
+            c_name,
+            country_name='FR',
+            st_name='Loire Atlantique',
+            locality_name='Nantes',
+            o_name='owkin',
+            dns_name='rca-owkin'):
+    csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
+        # Provide various details about who we are.
+        x509.NameAttribute(NameOID.COUNTRY_NAME, country_name),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, st_name),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, locality_name),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, o_name),
+        x509.NameAttribute(NameOID.COMMON_NAME, c_name),
+    ])).add_extension(
+        # Describe what sites we want this certificate for.
+        x509.SubjectAlternativeName([
+            # Describe what sites we want this certificate for.
+            x509.DNSName(dns_name),
+        ]),
+        critical=False,
+        # Sign the CSR with our private key (rsa or ecdsa).
+    ).sign(pkey, hashes.SHA256(), default_backend())
+
+    return csr
 
 
 LEDGER['hfc'] = get_hfc_client
