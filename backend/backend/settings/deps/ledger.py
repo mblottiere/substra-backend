@@ -134,9 +134,11 @@ def update_client_with_discovery(client, discovery_results):
                 tls_root_cert.flush()
 
                 url = peer_info['endpoint']
-                external_port = os.environ.get('BACKEND_PEER_PORT_EXTERNAL', None)
+                external_ports = os.environ.get('BACKEND_PEER_PORT_EXTERNAL', None)
                 # use case for external development
-                if external_port:
+                if external_ports:
+                    external_ports = json.loads(external_ports)
+                    external_port = external_ports[peer_info['mspid']]
                     url = f"{peer_info['endpoint'].split(':')[0]}:{external_port}"
                 peer.init_with_bundle({
                     'url': url,

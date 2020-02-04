@@ -149,7 +149,7 @@ def wait():
                                                              'tuples-updated',
                                                              onEvent=on_tuples)
 
-                    logger.error(f'Connect to Channel Event Hub')
+                    logger.info(f'Connect to Channel Event Hub')
                     loop.run_until_complete(stream)
 
                 except RpcError as e:
