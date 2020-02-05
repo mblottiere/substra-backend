@@ -138,8 +138,9 @@ def update_client_with_discovery(client, discovery_results):
                 # use case for external development
                 if external_ports:
                     external_ports = json.loads(external_ports)
-                    external_port = external_ports[peer_info['mspid']]
-                    url = f"{peer_info['endpoint'].split(':')[0]}:{external_port}"
+                    peer_host = peer_info['endpoint'].split(':')[0]
+                    external_port = external_ports[peer_host]
+                    url = f"{peer_host}:{external_port}"
                 peer.init_with_bundle({
                     'url': url,
                     'grpcOptions': {

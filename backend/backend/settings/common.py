@@ -99,7 +99,7 @@ MIDDLEWARE = [
 ]
 
 
-DJANGO_LOG_SQL_QUERIES = to_bool(os.environ.get('DJANGO_LOG_SQL_QUERIES', 'True'))
+DJANGO_LOG_SQL_QUERIES = to_bool(os.environ.get('DJANGO_LOG_SQL_QUERIES', True))
 if DJANGO_LOG_SQL_QUERIES:
     MIDDLEWARE.append(
         'libs.sql_printing_middleware.SQLPrintingMiddleware'

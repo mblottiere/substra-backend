@@ -6,7 +6,7 @@ import time
 
 from django.conf import settings
 from rest_framework import status
-from grpc import RpcError
+from grpc import RpcError, _channel
 
 
 LEDGER = getattr(settings, 'LEDGER', None)
@@ -113,7 +113,7 @@ def retry_on_error(delay=1, nbtries=5, backoff=2, exceptions=None):
         LedgerMVCCError,
         LedgerInvalidResponse,
         RpcError,
-        LedgerUnavailable,
+        #LedgerUnavailable,
         LedgerPhantomReadConflictError,
     ]
     exceptions_to_retry.extend(exceptions)
@@ -157,9 +157,7 @@ def get_hfc():
     try:
         yield (loop, client)
     finally:
-        loop.run_until_complete(
-            close_grpc_channels(client)
-        )
+        loop.run_until_complete(close_grpc_channels(client))
         del client
         loop.close()
 
@@ -222,7 +220,9 @@ def _call_ledger(call_type, fcn, args=None, kwargs=None):
             'peers': peers[call_type],
             'args': args,
             'cc_name': chaincode_name,
-            'fcn': fcn
+            'fcn': fcn,
+            'grpc_broker_unavailable_retry': 100,
+            'grpc_broker_unavailable_retry_delay': 3000
         }
 
         if kwargs is not None and isinstance(kwargs, dict):
@@ -237,9 +237,14 @@ def _call_ledger(call_type, fcn, args=None, kwargs=None):
             if hasattr(e, 'details') and 'access denied' in e.details():
                 raise LedgerForbidden(f'Access denied for {(fcn, args)}')
 
-            if hasattr(e, 'details') and 'failed to connect to all addresses' in e.details():
-                logger.error(f'failed to reach all peers {all_peers}, current_peer is {current_peer}')
-                raise LedgerUnavailable(f'Failed to connect to all addresses for {(fcn, args)}')
+            # gRPC error code 14 handling
+            # can be `14: DNS Resolution failed` or `14: UNAVAILABLE: failed to connect to all addresse`
+            # equivalent of HTTP 503 error
+            # should not happen with new fabric-sdk-py version
+            if isinstance(e, _channel._MultiThreadedRendezvous) and e.code().value[0] == 14:
+                msg = f'{e.details()}; fcn: {fcn}, args: {args}'
+                logger.error(msg)
+                raise LedgerUnavailable(msg)
 
             for arg in e.args:
                 if 'MVCC_READ_CONFLICT' in arg:

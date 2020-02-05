@@ -175,5 +175,6 @@ class EventsConfig(AppConfig):
             else:
                 break
 
-        p1 = multiprocessing.Process(target=wait)
-        p1.start()
+        # TODO uncomment before merge
+        # p1 = multiprocessing.Process(target=wait)
+        # p1.start()
