@@ -238,7 +238,7 @@ def _call_ledger(call_type, fcn, args=None, kwargs=None):
                 raise LedgerForbidden(f'Access denied for {(fcn, args)}')
 
             # gRPC error code 14 handling
-            # can be `14: DNS Resolution failed` or `14: UNAVAILABLE: failed to connect to all addresse`
+            # can be `14: DNS Resolution failed` or `14: UNAVAILABLE: failed to connect to all addresses`
             # equivalent of HTTP 503 error
             # should not happen with new fabric-sdk-py version
             if isinstance(e, _channel._MultiThreadedRendezvous) and e.code().value[0] == 14:
