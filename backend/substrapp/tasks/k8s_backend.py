@@ -4,7 +4,7 @@ import requests
 import os
 import logging
 
-
+from django.conf import settings
 from substrapp.utils import get_subtuple_directory, timeit
 from distutils.dir_util import copy_tree
 
@@ -386,7 +386,11 @@ def generate_volumes(volume_binds, name, subtuple_key):
             volume_processed = True
 
         # Handle outputs paths which need to be writable
-        for subpath in ['/pred', '/output_model', '/perf', '/export']:
+        writable_subpath = ['/pred', '/output_model', '/perf', '/export']
+        if settings.TASK['CHAINKEYS_ENABLED']:
+            writable_subpath.append('/chainkeys')
+
+        for subpath in writable_subpath:
             if subpath in path and bind['mode'] == 'rw':
                 volume_mounts.append({
                     'name': 'outputs',
