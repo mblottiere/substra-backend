@@ -699,7 +699,7 @@ def copy_chainkeys_to_output_pvc(chainkeys_directory, subtuple_directory):
         volume_mounts=[
             {'name': 'computeplan',
              'mountPath': '/chainkeys_worker',
-             'subPath': chainkeys_directory,
+             'subPath': chainkeys_directory.split('computeplan/')[-1],
              'readOnly': True},
             {'name': 'outputs',
              'mountPath': '/chainkeys_for_job',
