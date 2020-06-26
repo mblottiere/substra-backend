@@ -4,9 +4,9 @@ import kubernetes
 import requests
 import os
 import logging
+from django.conf import settings
 
 from substrapp.utils import timeit
-
 import time
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ RUN_AS_GROUP = os.getenv('RUN_AS_GROUP')
 RUN_AS_USER = os.getenv('RUN_AS_USER')
 FS_GROUP = os.getenv('FS_GROUP')
 IMAGE_BUILDER = os.getenv('IMAGE_BUILDER')
+
 
 K8S_PVC = {
     env_key: env_value for env_key, env_value in os.environ.items() if '_PVC' in env_key
@@ -246,6 +247,8 @@ def k8s_build_image(path, tag, rm):
 
     dockerfile_mount_subpath = path.split('/subtuple/')[-1]
 
+    celery_worker_concurrency = int(getattr(settings, 'CELERY_WORKER_CONCURRENCY'))
+
     if IMAGE_BUILDER == 'kaniko':
         # kaniko build can be launched without privilege but
         # it needs some capabilities and to be root
@@ -253,6 +256,7 @@ def k8s_build_image(path, tag, rm):
         command = None
         mount_path_dockerfile = path
         mount_path_cache = '/cache'
+        mount_subpath_cache = []
         args = [
             f'--dockerfile={dockerfile_fullpath}',
             f'--context=dir://{path}',
@@ -274,14 +278,18 @@ def k8s_build_image(path, tag, rm):
         image = 'gcr.io/uber-container-tools/makisu:v0.2.0'
         command = None
         mount_path_dockerfile = '/makisu-context'
-        mount_path_cache = '/makisu-storage'
+        # if celery worker concurrency > 1 we cannot share /makisu-storage between builder pods
+        # it raises errors
+        mount_path_cache = None if celery_worker_concurrency > 1 else '/makisu-storage'
+        mount_subpath_cache = []
         args = [
             'build',
             f'--push={REGISTRY}',
             f'-t={tag}:substra',
             '--modifyfs=true',
-            f'--storage={mount_path_cache}'
         ]
+        if mount_path_cache is not None:
+            args.append(f'--storage={mount_path_cache}')
 
         if REGISTRY_SCHEME == 'http':
             registry_config = json.dumps(
@@ -300,7 +308,12 @@ def k8s_build_image(path, tag, rm):
         image = 'docker:19.03-dind'
         command = ['/bin/sh', '-c']
         mount_path_dockerfile = path
+        # if celery worker concurrency > 1 we cannot share /makisu-storage between builder pods
+        # it raises errors
+        # mount_path_cache = None if celery_worker_concurrency > 1 else '/var/lib/docker'
+        # mount_subpath_cache = [] if celery_worker_concurrency > 1 else ['overlay2', 'image']
         mount_path_cache = '/var/lib/docker'
+        mount_subpath_cache = ['overlay2', 'image']
         wait_for_docker = 'while ! (docker ps); do sleep 1; done'
         build_args = (
             f'docker build -t "{REGISTRY}/{tag}:substra" {path} ;'
@@ -330,11 +343,20 @@ def k8s_build_image(path, tag, rm):
     )
 
     if mount_path_cache is not None:
-        container.volume_mounts.append({
-            'name': 'cache',
-            'mountPath': mount_path_cache,
-            'readOnly': (IMAGE_BUILDER == 'kaniko')
-        })
+        if mount_subpath_cache:
+            for subpath_cache in mount_subpath_cache:
+                container.volume_mounts.append({
+                    'name': 'cache',
+                    'mountPath': os.path.join(mount_path_cache, subpath_cache),
+                    'subPath': subpath_cache,
+                    'readOnly': (IMAGE_BUILDER == 'kaniko')
+                })
+        else:
+            container.volume_mounts.append({
+                'name': 'cache',
+                'mountPath': mount_path_cache,
+                'readOnly': (IMAGE_BUILDER == 'kaniko')
+            })
 
     pod_affinity = kubernetes.client.V1Affinity(
         pod_affinity=kubernetes.client.V1PodAffinity(
@@ -384,27 +406,33 @@ def k8s_build_image(path, tag, rm):
         spec=spec
     )
 
-    k8s_client.create_namespaced_pod(body=pod, namespace=NAMESPACE)
+    build_image = not pod_exists(job_name)
+    if build_image:
+        k8s_client.create_namespaced_pod(body=pod, namespace=NAMESPACE)
 
     try:
         watch_pod(job_name)
     except Exception as e:
-        logger.error(f'{IMAGE_BUILDER} build failed, error: {e}')
-        raise BuildError(f'{IMAGE_BUILDER} build failed, error: {e}')
+        # In case of concurrent build, it may fail
+        # check if image exists
+        if not k8s_image_exits(tag):
+            logger.error(f'{IMAGE_BUILDER} build failed, error: {e}')
+            raise BuildError(f'{IMAGE_BUILDER} build failed, error: {e}')
     finally:
-        container_format_log(
-            job_name,
-            get_pod_logs(name=get_pod_name(job_name),
-                         container=job_name)
-        )
-        k8s_client.delete_namespaced_pod(
-            name=job_name,
-            namespace=NAMESPACE,
-            body=kubernetes.client.V1DeleteOptions(
-                propagation_policy='Foreground',
-                grace_period_seconds=0
+        if build_image:
+            container_format_log(
+                job_name,
+                get_pod_logs(name=get_pod_name(job_name),
+                             container=job_name)
             )
-        )
+            k8s_client.delete_namespaced_pod(
+                name=job_name,
+                namespace=NAMESPACE,
+                body=kubernetes.client.V1DeleteOptions(
+                    propagation_policy='Foreground',
+                    grace_period_seconds=0
+                )
+            )
 
 
 def k8s_get_image(image_name):
@@ -416,6 +444,15 @@ def k8s_get_image(image_name):
         raise ImageNotFound(f'Error when querying docker-registry, status code: {response.status_code}')
 
     return response.json()
+
+
+def k8s_image_exits(image_name):
+    try:
+        k8s_get_image(image_name)
+    except ImageNotFound:
+        return False
+    else:
+        return True
 
 
 def k8s_remove_image(image_name):
