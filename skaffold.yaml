@@ -133,7 +133,7 @@ deploy:
             tokenStrategy: 'reuse'
             defaultDomain: http://backend-org-1-substra-backend-server.org-1:8000
             imageBuilder:
-              type: dind
+              type: makisu
             ingress:
               enabled: true
               hosts:
@@ -204,7 +204,7 @@ deploy:
             tokenStrategy: 'reuse'
             defaultDomain: http://backend-org-2-substra-backend-server.org-2:8000
             imageBuilder:
-              type: dind
+              type: makisu
             ingress:
               enabled: true
               hosts:

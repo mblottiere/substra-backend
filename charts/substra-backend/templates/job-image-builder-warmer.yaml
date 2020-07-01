@@ -126,24 +126,24 @@ spec:
   backoffLimit: 4
 {{- end }}
 
+
+
 {{- if eq .Values.backend.imageBuilder.type "makisu" }}
 # TO DO
 # Makisu cannot pull image through a cmd
 # We need to fake a build of the image to cache it
-# Maybe using a configmap Dockerfile for each element of prePulledImages
-# FROM <image>
 
-{{ range $index, $img :=  .Values.prePulledImages }}
+
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ template "substra.fullname" $ }}-makisu-cache-warmer-{{ $index }}
+  name: {{ template "substra.fullname" . }}-makisu-cache-warmer
   labels:
-    app.kubernetes.io/managed-by: {{ $.Release.Service }}
-    app.kubernetes.io/instance: {{ $.Release.Name }}
-    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
-    app.kubernetes.io/name: {{ template "substra.name" $ }}-makisu-cache-warmer
-    app.kubernetes.io/part-of: {{ template "substra.name" $ }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    app.kubernetes.io/name: {{ template "substra.name" . }}-makisu-cache-warmer
+    app.kubernetes.io/part-of: {{ template "substra.name" . }}
 spec:
   template:
     spec:
@@ -159,24 +159,27 @@ spec:
               - key: app.kubernetes.io/name
                 operator: In
                 values:
-                - {{ template "substra.name" $ }}-worker
+                - {{ template "substra.name" . }}-worker
             topologyKey: kubernetes.io/hostname
       initContainers:
       - name: populate-warmup-folder
-        image: gcr.io/uber-container-tools/makisu:v0.2.0
+        image: gcr.io/uber-container-tools/makisu-alpine:v0.2.0
+        command: ['sh', '-c']
         args:
-          - "build"
-          - "-t={{ $img }}:warm"
-          - "--modifyfs=true"
-          - "/makisu-context"
+        - |
+          {{ range $index, $img := .Values.prePulledImages }}
+          /makisu-internal/makisu build --modifyfs=true -t={{ $img }}:warm /makisu-context/{{ $index }}
+          {{- end }}
         volumeMounts:
         - name: makisu-cache
           mountPath: /makisu-storage
-          subPath: warm-{{ $index }}
+          subPath: warm
           readOnly: False
-        - name: dockerfile
-          mountPath: /makisu-context
+        {{ range $index, $img := .Values.prePulledImages }}
+        - name: dockerfile-{{ $index }}
+          mountPath: /makisu-context/{{ $index}}
           readOnly: true
+        {{- end }}
       - name: copy-to-cache
         image: alpine:latest
         command: ['sh', '-c']
@@ -194,11 +197,11 @@ spec:
           find ${CACHE_PATH} -maxdepth 2
         env:
           - name: CONCURRENCY
-            value: {{ $.Values.celeryworker.concurrency | quote }}
+            value: {{ .Values.celeryworker.concurrency | quote }}
           - name: CACHE_PATH
             value: /makisu-storage
           - name: WARM_PATH
-            value: /makisu-storage/warm-{{ $index }}
+            value: /makisu-storage/warm
         volumeMounts:
         - name: makisu-cache
           mountPath: /makisu-storage
@@ -212,10 +215,14 @@ spec:
       - name: makisu-cache
         persistentVolumeClaim:
           claimName: {{ include "substra.fullname" $ }}-docker-cache
-      - name: dockerfile
+      {{ range $index, $img := .Values.prePulledImages }}
+      - name: dockerfile-{{ $index }}
         configMap:
           name: {{ template "substra.fullname" $ }}-makisu-dockerfile-{{ $index }}
+      {{- end }}
   backoffLimit: 4
+
+{{ range $index, $img := .Values.prePulledImages }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -231,4 +238,5 @@ data:
     FROM {{ $img }}
 ---
 {{- end }}
+
 {{- end }}
