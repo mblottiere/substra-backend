@@ -248,6 +248,7 @@ class ObjectiveViewTests(APITestCase):
 
             self.client.get(url, data={'sort': 'desc'}, **self.extra)
             mquery_ledger.assert_called_with(
+                'mychannel',
                 fcn='queryObjectiveLeaderboard',
                 args={
                     'objectiveKey': objective[0]['key'],
@@ -256,6 +257,7 @@ class ObjectiveViewTests(APITestCase):
 
             self.client.get(url, data={'sort': 'asc'}, **self.extra)
             mquery_ledger.assert_called_with(
+                'mychannel',
                 fcn='queryObjectiveLeaderboard',
                 args={
                     'objectiveKey': objective[0]['key'],

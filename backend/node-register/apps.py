@@ -19,7 +19,7 @@ class NodeRegisterConfig(AppConfig):
         while True:
             try:
                 # args is set to empty because fabric-sdk-py doesn't allow None args for invoke operations
-                invoke_ledger(fcn='registerNode', args=[''], sync=True)
+                invoke_ledger('mychannel', fcn='registerNode', args=[''], sync=True)
             except RpcError as e:
                 if not settings.DEBUG:
                     raise

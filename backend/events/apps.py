@@ -128,9 +128,8 @@ def on_event(cc_event, block_number, tx_id, tx_status):
                 on_tuples_event(tx_status, event_type, asset)
 
 
-def wait():
+def wait(channel_name):
     with get_event_loop() as loop:
-        channel_name = LEDGER['channel_name']
         chaincode_name = LEDGER['chaincode_name']
         peer = LEDGER['peer']
 
@@ -200,12 +199,12 @@ class EventsConfig(AppConfig):
     name = 'events'
 
     def ready(self):
-
+        channel = 'mychannel'
         # We try to connect a client first, if it fails the backend will not start
         # It avoid potential issue when we launch the channel event hub in a subprocess
         while True:
             try:
-                with get_hfc() as (loop, client):
+                with get_hfc(channel) as (loop, client):
                     logger.info('Start the event application.')
             except Exception as e:
                 logger.exception(e)
@@ -214,5 +213,5 @@ class EventsConfig(AppConfig):
             else:
                 break
 
-        p1 = multiprocessing.Process(target=wait)
+        p1 = multiprocessing.Process(target=wait, args=[channel])
         p1.start()

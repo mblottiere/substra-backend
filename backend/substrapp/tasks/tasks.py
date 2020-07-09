@@ -62,7 +62,7 @@ class TasksError(Exception):
 def get_objective(tuple_):
 
     objective_hash = tuple_['objective']['hash']
-    objective_metadata = get_object_from_ledger(objective_hash, 'queryObjective')
+    objective_metadata = get_object_from_ledger('mychannel', objective_hash, 'queryObjective')
 
     objective_content = get_asset_content(
         objective_metadata['metrics']['storageAddress'],
@@ -94,7 +94,7 @@ def get_algo(tuple_type, tuple_):
     method_name = query_method_names_mapper[tuple_type]
 
     key = tuple_['algo']['hash']
-    metadata = get_object_from_ledger(key, method_name)
+    metadata = get_object_from_ledger('mychannel', key, method_name)
 
     content = get_asset_content(
         metadata['content']['storageAddress'],
@@ -126,7 +126,7 @@ def find_training_step_tuple_from_key(tuple_key):
 
     Applies to traintuple, composite traintuple and aggregatetuple.
     """
-    metadata = get_object_from_ledger(tuple_key, 'queryModelDetails')
+    metadata = get_object_from_ledger('mychannel', tuple_key, 'queryModelDetails')
     if metadata.get('aggregatetuple'):
         return AGGREGATETUPLE_TYPE, metadata['aggregatetuple']
     if metadata.get('compositeTraintuple'):
@@ -286,7 +286,7 @@ def prepare_testtuple_input_models(directory, tuple_):
     # TODO we should use the find method to be consistent with the traintuple
 
     if traintuple_type == TRAINTUPLE_TYPE:
-        metadata = get_object_from_ledger(traintuple_key, 'queryTraintuple')
+        metadata = get_object_from_ledger('mychannel', traintuple_key, 'queryTraintuple')
         model_dst_path = path.join(directory, f'model/{traintuple_key}')
         raise_if_path_traversal([model_dst_path], path.join(directory, 'model/'))
         get_and_put_model_content(
@@ -294,7 +294,7 @@ def prepare_testtuple_input_models(directory, tuple_):
         )
 
     elif traintuple_type == COMPOSITE_TRAINTUPLE_TYPE:
-        metadata = get_object_from_ledger(traintuple_key, 'queryCompositeTraintuple')
+        metadata = get_object_from_ledger('mychannel', traintuple_key, 'queryCompositeTraintuple')
         head_model_dst_path = path.join(directory, f'model/{PREFIX_HEAD_FILENAME}{traintuple_key}')
         raise_if_path_traversal([head_model_dst_path], path.join(directory, 'model/'))
         get_and_put_local_model_content(traintuple_key, metadata['outHeadModel']['outModel'],
@@ -461,7 +461,7 @@ def prepare_aggregate_task():
 def prepare_task(tuple_type):
     data_owner = get_owner()
     worker_queue = f"{settings.LEDGER['name']}.worker"
-    tuples = query_tuples(tuple_type, data_owner)
+    tuples = query_tuples('mychannel', tuple_type, data_owner)
 
     for subtuple in tuples:
         tkey = subtuple['key']
@@ -499,7 +499,7 @@ def prepare_tuple(subtuple, tuple_type):
             worker_queue = json.loads(flresults.first().as_dict()['result'])['worker']
 
     try:
-        log_start_tuple(tuple_type, subtuple['key'])
+        log_start_tuple('mychannel', tuple_type, subtuple['key'])
     except LedgerStatusError as e:
         # Do not log_fail_tuple in this case, because prepare_tuple task are not unique
         # in case of multiple instances of substra backend running for the same organisation
@@ -519,7 +519,7 @@ class ComputeTask(Task):
 
         tuple_type, subtuple, compute_plan_id = self.split_args(args)
         try:
-            log_success_tuple(tuple_type, subtuple['key'], retval['result'])
+            log_success_tuple('mychannel', tuple_type, subtuple['key'], retval['result'])
         except LedgerError as e:
             logger.exception(e)
 
@@ -538,7 +538,7 @@ class ComputeTask(Task):
             type_value = str(type_exc).split("'")[1]
             logger.error(f'{tuple_type} {subtuple["key"]} {error_code} - {type_value}',
                          exc_info=exc_info)
-            log_fail_tuple(tuple_type, subtuple['key'], error_code)
+            log_fail_tuple('mychannel', tuple_type, subtuple['key'], error_code)
         except LedgerError as e:
             logger.exception(e)
 
@@ -631,7 +631,7 @@ def do_task(subtuple, tuple_type):
     if 'computePlanID' in subtuple and subtuple['computePlanID']:
         compute_plan_id = subtuple['computePlanID']
         rank = int(subtuple['rank'])
-        compute_plan = get_object_from_ledger(compute_plan_id, 'queryComputePlan')
+        compute_plan = get_object_from_ledger('mychannel', compute_plan_id, 'queryComputePlan')
         compute_plan_tag = compute_plan['tag']
 
     client = docker.from_env()

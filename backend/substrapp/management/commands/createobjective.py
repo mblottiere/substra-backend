@@ -138,7 +138,7 @@ class Command(BaseCommand):
                     self.stderr.write(str(e))
                 else:
                     # create on ledger
-                    res, st = ledger_serializer.create(ledger_serializer.validated_data)
+                    res, st = ledger_serializer.create('mychannel', ledger_serializer.validated_data)
 
                     if st not in (status.HTTP_201_CREATED, status.HTTP_202_ACCEPTED, status.HTTP_408_REQUEST_TIMEOUT):
                         self.stderr.write(json.dumps(res, indent=2))
@@ -225,6 +225,7 @@ class Command(BaseCommand):
                 else:
                     # create on ledger
                     res, st = ledger_serializer.create(
+                        'mychannel',
                         ledger_serializer.validated_data)
 
                     if st not in (
