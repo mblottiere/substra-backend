@@ -50,6 +50,8 @@ class TrainTupleViewSet(mixins.CreateModelMixin,
         args = serializer.get_args(serializer.validated_data)
 
         try:
+            channel_name = request.user.channel.name
+            print(f"This the channel name I read{channel_name}")
             data = query_ledger('mychannel', fcn='createTraintuple', args=args)
         except LedgerConflict as e:
             raise LedgerException({'message': str(e.msg), 'pkhash': e.pkhash}, e.status)

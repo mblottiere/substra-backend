@@ -150,7 +150,7 @@ peer:
 
 channels:
 - mychannel
-- yourchannel
+# - yourchannel
 
 chaincode:
   name: mycc
