@@ -443,7 +443,7 @@ class TasksTests(APITestCase):
 
             with mock.patch('substrapp.tasks.tasks.compute_docker') as mcompute_docker:
                 mcompute_docker.return_value = 'DONE'
-                do_task(subtuple, 'traintuple')
+                do_task('mychannel', subtuple, 'traintuple')
 
     def test_compute_task(self):
 
@@ -475,16 +475,16 @@ class TasksTests(APITestCase):
                 mdo_task.return_value = 'DONE'
 
                 mlog_success_tuple.return_value = 'data', 201
-                compute_task('traintuple', subtuple, None)
+                compute_task('mychannel', 'traintuple', subtuple, None)
 
                 mlog_success_tuple.return_value = 'data', 404
-                compute_task('traintuple', subtuple, None)
+                compute_task('mychannel', 'traintuple', subtuple, None)
 
                 with mock.patch('substrapp.tasks.tasks.log_fail_tuple') as mlog_fail_tuple:
                     mdo_task.side_effect = Exception("Test")
                     mlog_fail_tuple.return_value = 'data', 404
                     with self.assertRaises(Exception) as exc:
-                        compute_task('traintuple', subtuple, None)
+                        compute_task('mychannel', 'traintuple', subtuple, None)
                     self.assertEqual(str(exc.exception), "Test")
 
     def test_prepare_materials(self):

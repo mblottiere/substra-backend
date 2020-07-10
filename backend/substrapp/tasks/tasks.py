@@ -459,25 +459,29 @@ def prepare_aggregate_task():
 
 
 def prepare_task(tuple_type):
+    prepare_channel_task('mychannel', tuple_type)
+
+
+def prepare_channel_task(channel, tuple_type):
     data_owner = get_owner()
     worker_queue = f"{settings.LEDGER['name']}.worker"
-    tuples = query_tuples('mychannel', tuple_type, data_owner)
+    tuples = query_tuples(channel, tuple_type, data_owner)
 
     for subtuple in tuples:
         tkey = subtuple['key']
         # Verify that tuple task does not already exist
         if AsyncResult(tkey).state == 'PENDING':
             prepare_tuple.apply_async(
-                (subtuple, tuple_type),
+                (channel, subtuple, tuple_type),
                 task_id=tkey,
                 queue=worker_queue
             )
         else:
-            print(f'[Scheduler] Tuple task ({tkey}) already exists')
+            print(f'[Scheduler ({channel})] Tuple task ({tkey}) already exists')
 
 
 @app.task(ignore_result=False)
-def prepare_tuple(subtuple, tuple_type):
+def prepare_tuple(channel, subtuple, tuple_type):
     from django_celery_results.models import TaskResult
 
     compute_plan_id = None
@@ -499,7 +503,7 @@ def prepare_tuple(subtuple, tuple_type):
             worker_queue = json.loads(flresults.first().as_dict()['result'])['worker']
 
     try:
-        log_start_tuple('mychannel', tuple_type, subtuple['key'])
+        log_start_tuple(channel, tuple_type, subtuple['key'])
     except LedgerStatusError as e:
         # Do not log_fail_tuple in this case, because prepare_tuple task are not unique
         # in case of multiple instances of substra backend running for the same organisation
@@ -508,7 +512,7 @@ def prepare_tuple(subtuple, tuple_type):
         raise Ignore()
 
     compute_task.apply_async(
-        (tuple_type, subtuple, compute_plan_id),
+        (channel, tuple_type, subtuple, compute_plan_id),
         queue=worker_queue)
 
 
@@ -517,16 +521,16 @@ class ComputeTask(Task):
         from django.db import close_old_connections
         close_old_connections()
 
-        tuple_type, subtuple, compute_plan_id = self.split_args(args)
+        channel, tuple_type, subtuple, compute_plan_id = self.split_args(args)
         try:
-            log_success_tuple('mychannel', tuple_type, subtuple['key'], retval['result'])
+            log_success_tuple(channel, tuple_type, subtuple['key'], retval['result'])
         except LedgerError as e:
             logger.exception(e)
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         from django.db import close_old_connections
         close_old_connections()
-        tuple_type, subtuple, compute_plan_id = self.split_args(args)
+        channel, tuple_type, subtuple, compute_plan_id = self.split_args(args)
 
         try:
             error_code = compute_error_code(exc)
@@ -538,22 +542,23 @@ class ComputeTask(Task):
             type_value = str(type_exc).split("'")[1]
             logger.error(f'{tuple_type} {subtuple["key"]} {error_code} - {type_value}',
                          exc_info=exc_info)
-            log_fail_tuple('mychannel', tuple_type, subtuple['key'], error_code)
+            log_fail_tuple(channel, tuple_type, subtuple['key'], error_code)
         except LedgerError as e:
             logger.exception(e)
 
     def split_args(self, celery_args):
-        tuple_type = celery_args[0]
-        subtuple = celery_args[1]
-        compute_plan_id = celery_args[2]
-        return tuple_type, subtuple, compute_plan_id
+        channel = celery_args[0]
+        tuple_type = celery_args[1]
+        subtuple = celery_args[2]
+        compute_plan_id = celery_args[3]
+        return channel, tuple_type, subtuple, compute_plan_id
 
 
 @app.task(bind=True, acks_late=True, reject_on_worker_lost=True, ignore_result=False, base=ComputeTask)
 # Ack late and reject on worker lost allows use to
 # see http://docs.celeryproject.org/en/latest/userguide/configuration.html#task-reject-on-worker-lost
 # and https://github.com/celery/celery/issues/5106
-def compute_task(self, tuple_type, subtuple, compute_plan_id):
+def compute_task(self, channel, tuple_type, subtuple, compute_plan_id):
 
     try:
         worker = self.request.hostname.split('@')[1]
@@ -566,7 +571,7 @@ def compute_task(self, tuple_type, subtuple, compute_plan_id):
 
     try:
         prepare_materials(subtuple, tuple_type)
-        res = do_task(subtuple, tuple_type)
+        res = do_task(channel, subtuple, tuple_type)
         result['result'] = res
     except Exception as e:
         raise self.retry(
@@ -619,7 +624,7 @@ def prepare_materials(subtuple, tuple_type):
 
 
 @timeit
-def do_task(subtuple, tuple_type):
+def do_task(channel, subtuple, tuple_type):
     subtuple_directory = get_subtuple_directory(subtuple)
     org_name = getattr(settings, 'ORG_NAME')
 
@@ -631,7 +636,7 @@ def do_task(subtuple, tuple_type):
     if 'computePlanID' in subtuple and subtuple['computePlanID']:
         compute_plan_id = subtuple['computePlanID']
         rank = int(subtuple['rank'])
-        compute_plan = get_object_from_ledger('mychannel', compute_plan_id, 'queryComputePlan')
+        compute_plan = get_object_from_ledger(channel, compute_plan_id, 'queryComputePlan')
         compute_plan_tag = compute_plan['tag']
 
     client = docker.from_env()
@@ -1014,7 +1019,7 @@ def remove_intermediary_models(model_hashes):
 
 
 @app.task(ignore_result=False)
-def on_compute_plan(compute_plan):
+def on_compute_plan(channel, compute_plan):
 
     compute_plan_id = compute_plan['computePlanID']
     algo_hashes = compute_plan['algoKeys']
