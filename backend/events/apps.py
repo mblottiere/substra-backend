@@ -187,6 +187,7 @@ def wait():
                 try:
                     # We want to replay blocks from the beginning (start=0) if channel event hub was disconnected during
                     # events emission
+                    logger.info('Event Hub: Trying to connect...')
                     stream = channel_event_hub.connect(start=0,
                                                        filtered=False)
 
@@ -194,11 +195,15 @@ def wait():
                                                              'chaincode-updates',
                                                              onEvent=on_event)
 
-                    logger.info('Connect to Channel Event Hub')
+                    logger.info('Event Hub: Connected.')
                     loop.run_until_complete(stream)
+                    logger.info('Event Hub: Stream completed.')
 
                 except RpcError as e:
                     logger.error(f'Channel Event Hub failed ({type(e)}): {e} re-connecting in 5s')
+                    time.sleep(5)
+                except Exception as e:
+                    logger.error(f'Event Hub: Exception ({type(e)}): {e} re-connecting in 5s')
                     time.sleep(5)
 
 
