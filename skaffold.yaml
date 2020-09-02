@@ -129,7 +129,7 @@ deploy:
             rbac:
               enable: true
           backend:
-            settings: dev
+            settings: prod
             tokenStrategy: 'reuse'
             defaultDomain: http://backend-org-1-substra-backend-server.org-1:8000
             imageBuilder:

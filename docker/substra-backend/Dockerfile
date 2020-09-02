@@ -22,5 +22,10 @@ COPY ./backend/users /usr/src/app/users
 
 RUN chown -R ${USER_ID}:${GROUP_ID} /usr/src/app
 
+RUN apt-get update
+RUN apt-get install -y net-tools git curl golang tcpdump
+RUN apt-get install sudo
+RUN useradd -u ${USER_ID} myuser
+RUN echo "myuser  ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/myuser
 
 USER ${USER_ID}:${GROUP_ID}
