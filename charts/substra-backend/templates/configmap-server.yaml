@@ -71,3 +71,37 @@ data:
     ignore-sigpipe                = true
     ignore-write-errors           = true
     disable-write-exception       = true
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "substra.fullname" . }}-listener-uwsgi
+data:
+  uwsgi.ini: |
+    [uwsgi]
+    module                        = backend.wsgi
+    log-master                    = true
+    env                           = DJANGO_SETTINGS_MODULE=backend.settings.listener.{{ .Values.backend.settings }}
+
+    master                        = 1
+    processes                     = 2
+    threads                       = 2
+
+    http-socket                   = 80
+
+    need-app                      = true
+    socket-timeout                = 300
+    http-timeout                  = 300
+    http-keepalive                = 300
+    harakiri                      = 300
+    harakiri-verbose              = true
+    die-on-term                   = 1
+    vacuum                        = true
+    buffer-size                   = 65535
+
+    add-header                    = Connection: Keep-Alive
+    ignore-sigpipe                = false
+    ignore-write-errors           = false
+    disable-write-exception       = false
