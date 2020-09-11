@@ -45,7 +45,16 @@ def get_hfc_client():
     peer = Peer(name=LEDGER['peer']['name'])
     peer.init_with_bundle({
         'url': f'{LEDGER["peer"]["host"]}:{PEER_PORT}',
-        'grpcOptions': LEDGER['peer']['grpcOptions'],
+        'grpcOptions': {
+            "grpc.ssl_target_name_override": LEDGER["peer"]["host"],
+            "grpc.max_send_message_length": -1,
+            "grpc.max_receive_message_length": -1,
+            "grpc.keepalive_time_ms": 120000,
+            "grpc.http2.min_time_between_pings_ms": 120000,
+            "grpc.keepalive_timeout_ms": 20000,
+            "grpc.http2.max_pings_without_data": 0,
+            "grpc.keepalive_permit_without_calls": 1
+        },
         'tlsCACerts': {'path': LEDGER['peer']['tlsCACerts']},
         'clientKey': {'path': LEDGER['peer']['clientKey']},
         'clientCert': {'path': LEDGER['peer']['clientCert']},
@@ -142,8 +151,13 @@ def update_client_with_discovery(client, discovery_results):
                     'url': url,
                     'grpcOptions': {
                         'grpc.ssl_target_name_override': peer_info['endpoint'].split(':')[0],
-                        'grpc.max_send_message_length': -1,
-                        'grpc.max_receive_message_length': -1
+                        "grpc.max_send_message_length": -1,
+                        "grpc.max_receive_message_length": -1,
+                        "grpc.keepalive_time_ms": 120000,
+                        "grpc.http2.min_time_between_pings_ms": 120000,
+                        "grpc.keepalive_timeout_ms": 20000,
+                        "grpc.http2.max_pings_without_data": 0,
+                        "grpc.keepalive_permit_without_calls": 1
                     },
                     'tlsCACerts': {'path': tls_root_cert.name},
                     'clientKey': {'path': LEDGER['peer']['clientKey']},  # use peer creds (mutual tls)
@@ -166,8 +180,13 @@ def update_client_with_discovery(client, discovery_results):
             'url': f"{orderer_info[0]['host']}:{orderer_info[0]['port']}",
             'grpcOptions': {
                 'grpc.ssl_target_name_override': orderer_info[0]['host'],
-                'grpc.max_send_message_length': -1,
-                'grpc.max_receive_message_length': -1
+                "grpc.max_send_message_length": -1,
+                "grpc.max_receive_message_length": -1,
+                "grpc.keepalive_time_ms": 120000,
+                "grpc.http2.min_time_between_pings_ms": 120000,
+                "grpc.keepalive_timeout_ms": 20000,
+                "grpc.http2.max_pings_without_data": 0,
+                "grpc.keepalive_permit_without_calls": 1
             },
             'tlsCACerts': {'path': tls_root_cert.name},
             'clientKey': {'path': LEDGER['peer']['clientKey']},  # use peer creds (mutual tls)
