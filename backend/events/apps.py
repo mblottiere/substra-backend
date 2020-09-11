@@ -151,7 +151,16 @@ def wait():
 
         target_peer.init_with_bundle({
             'url': f'{peer["host"]}:{peer_port}',
-            'grpcOptions': peer['grpcOptions'],
+            'grpcOptions': {
+                "grpc.ssl_target_name_override": LEDGER["peer"]["host"],
+                "grpc.max_send_message_length": -1,
+                "grpc.max_receive_message_length": -1,
+                "grpc.keepalive_time_ms": 120000,
+                "grpc.http2.min_time_between_pings_ms": 120000,
+                "grpc.keepalive_timeout_ms": 20000,
+                "grpc.http2.max_pings_without_data": 0,
+                "grpc.keepalive_permit_without_calls": 1
+            },
             'tlsCACerts': {'path': peer['tlsCACerts']},
             'clientKey': {'path': peer['clientKey']},
             'clientCert': {'path': peer['clientCert']},
