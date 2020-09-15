@@ -22,7 +22,7 @@ tldextract==2.2.2
 uwsgi==2.0.18
 zxcvbn==4.4.28
 boto3==1.11.9
-git+git://github.com/AurelienGasser/fabric-sdk-py.git@b5d55ea36ecdfe4e89e73652a91a0a7e289a53bc
+git+git://github.com/AurelienGasser/fabric-sdk-py.git@b03b7d63612e429f37f01c16ebc3398044c44339
 # dev-mode
 watchdog==0.10.2
 argh==0.26.2
