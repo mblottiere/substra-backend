@@ -93,10 +93,6 @@ spec:
             mountPath: /var/hyperledger/tls/client/pair
           - name: cacert
             mountPath: /var/hyperledger/ca
-          {{- if .Values.privateCa.enabled }}
-          - mountPath: /etc/ssl/certs
-            name: ssl-certs
-          {{- end }}
       initContainers:
       - name: wait-postgresql
         image: jwilder/dockerize
