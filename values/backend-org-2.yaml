@@ -12,7 +12,7 @@ registry:
   scheme: http
   pullDomain: 127.0.0.1:32002
   prepopulate:
-    - image: substrafoundation/substra-tools:0.7.0-minimal
+    - image: jmorelowkin/substra-tools:0.7.0-alpha.5
 
 secrets:
   fabricConfigmap: network-org-2-hlf-k8s-fabric
@@ -30,7 +30,7 @@ backend:
     cache:
       warmer:
         images:
-          - image: substrafoundation/substra-tools:0.7.0-minimal
+          - image: jmorelowkin/substra-tools:0.7.0-alpha.5
   ingress:
     enabled: true
     hosts:
