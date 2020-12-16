@@ -10,6 +10,7 @@ on:
 
 jobs:
   lint_and_tests:
+    name: Lint and tests
     env:
       DJANGO_SETTINGS_MODULE: backend.settings.test
     runs-on: ubuntu-latest
