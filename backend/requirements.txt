@@ -24,3 +24,4 @@ argh==0.26.2
 coverage==5.0.3
 mock==3.0.5
 parameterized==0.7.4
+tqdm
