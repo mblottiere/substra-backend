@@ -32,9 +32,9 @@ jobs:
           pip install -r backend/requirements.txt
       - name: Install tools
         run: pip install flake8 pep8-naming
-      - name: lint
+      - name: Lint
         run: flake8 backend/
-      - name: test
+      - name: Test
         run: |
           cd backend/
           coverage run manage.py test
